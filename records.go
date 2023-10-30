@@ -165,13 +165,21 @@ const (
 	RRTypeWKS RRType = "WKS"
 )
 
+func (r *RecordsService) AddWithComment(ctx context.Context, domain string, name string, recordType RRType, ttl uint32, content []string, comment []Comment) error {
+	return r.ChangeWithComment(ctx, domain, name, recordType, ttl, content, comment)
+}
+
 // Add creates a new resource record
 func (r *RecordsService) Add(ctx context.Context, domain string, name string, recordType RRType, ttl uint32, content []string) error {
 	return r.Change(ctx, domain, name, recordType, ttl, content)
 }
 
-// Change replaces an existing resource record
 func (r *RecordsService) Change(ctx context.Context, domain string, name string, recordType RRType, ttl uint32, content []string) error {
+	return r.ChangeWithComment(ctx, domain, name, recordType, ttl, content, []Comment{})
+}
+
+// Change replaces an existing resource record
+func (r *RecordsService) ChangeWithComment(ctx context.Context, domain string, name string, recordType RRType, ttl uint32, content []string, comment []Comment) error {
 	rrset := new(RRset)
 	rrset.Name = &name
 	rrset.Type = &recordType
@@ -183,6 +191,8 @@ func (r *RecordsService) Change(ctx context.Context, domain string, name string,
 		r := Record{Content: String(c), Disabled: Bool(false), SetPTR: Bool(false)}
 		rrset.Records = append(rrset.Records, r)
 	}
+
+	rrset.Comments = comment
 
 	payload := r.prepareRRSet(rrset)
 	return r.patchRRSet(ctx, domain, payload)
@@ -250,7 +260,6 @@ func (r *RecordsService) prepareRRSet(rrSet *RRset) *RRsets {
 }
 
 func (r *RecordsService) patchRRSet(ctx context.Context, domain string, rrSets *RRsets) error {
-
 	req, err := r.client.newRequest(ctx, "PATCH", fmt.Sprintf("servers/%s/zones/%s", r.client.VHost, makeDomainCanonical(domain)), nil, &rrSets)
 	if err != nil {
 		return err
